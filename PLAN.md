@@ -1,42 +1,43 @@
-# iPhoto Sifter - Implementation Plan
+# Photo Library Sifter - Implementation Plan
 
 ## Project Overview
-A Rust CLI application that scans a directory for photos, compares them against an iPhoto library, and adds any missing photos to the library.
+A Rust CLI application that scans a directory for photos, compares them against a Photos.app library, and adds any missing photos to the library.
 
 ## Goals
 1. Hash all photos in a specified directory
-2. Hash all photos in an iPhoto library
-3. Identify photos not in the iPhoto library
-4. Add missing photos to the iPhoto library
+2. Hash all photos in a Photos.app library
+3. Identify photos not in the Photos library
+4. Add missing photos to the Photos library
 5. Provide detailed reporting on additions
 
 ## Technical Background
 
-### iPhoto Library Structure
-iPhoto libraries (.photolibrary or .iPhotolibrary) are package directories with this structure:
+### Photos.app Library Structure
+Photos.app libraries (.photoslibrary) are package directories with this structure:
 ```
-MyLibrary.photolibrary/
-├── AlbumData.xml          # Main database (iPhoto 9.4 and earlier)
-├── Database/
-│   ├── apdb/              # SQLite databases (iPhoto 9.5+)
-│   │   ├── Library.apdb
-│   │   ├── Person.db
-│   │   └── ...
-│   └── BigBlobs.apdb
-├── Masters/               # Original photos organized by date
-│   └── YYYY/MM/DD/
-│       └── YYYYMMDD-HHMMSS/
-│           └── photo.jpg
-├── Previews/              # Preview images
-├── Thumbnails/            # Thumbnail images
-└── Data/                  # IPTC and other metadata
+MyLibrary.photoslibrary/
+├── database/
+│   ├── Photos.sqlite           # Main database (primary metadata)
+│   ├── Photos.sqlite-shm       # Shared memory file
+│   ├── Photos.sqlite-wal       # Write-ahead log
+│   ├── search/                 # Search index
+│   └── ...
+├── originals/                  # Original photos organized by UUID
+│   └── [UUID-based paths]/
+│       └── IMG_1234.jpg
+├── resources/                  # Derivatives, thumbnails, edited versions
+│   ├── derivatives/
+│   ├── media/
+│   └── renders/
+├── private/                    # Private cache data
+└── scopes/                     # Shared albums and iCloud data
 ```
 
 **Important Notes:**
-- iPhoto was discontinued in 2015, replaced by Photos.app
-- iPhoto 9.4 and earlier use XML (AlbumData.xml)
-- iPhoto 9.5+ use SQLite databases
-- We need to support both formats for compatibility
+- Photos.app replaced iPhoto in 2015 (OS X Yosemite)
+- Uses SQLite database (Photos.sqlite) for all metadata
+- Stores originals in UUID-based directory structure
+- Supports all modern formats: JPEG, PNG, HEIC, RAW (CR2, NEF, ARW, etc.), Live Photos
 
 ### Hash Algorithm
 - **SHA-256**: Industry standard, good balance of speed and collision resistance
@@ -50,15 +51,15 @@ iphoto-sifter/
 ├── src/
 │   ├── main.rs              # CLI entry point and argument parsing
 │   ├── lib.rs               # Library root
+│   ├── error.rs             # Error types
 │   ├── photo/
 │   │   ├── mod.rs           # Photo module
 │   │   ├── hasher.rs        # Photo hashing functionality
 │   │   └── scanner.rs       # Directory scanning
-│   ├── iphoto/
-│   │   ├── mod.rs           # iPhoto module
+│   ├── photos/
+│   │   ├── mod.rs           # Photos.app module
 │   │   ├── library.rs       # Library structure and parsing
-│   │   ├── xml_parser.rs    # XML-based library parser (iPhoto ≤9.4)
-│   │   ├── db_parser.rs     # SQLite-based parser (iPhoto 9.5+)
+│   │   ├── database.rs      # SQLite database access
 │   │   └── writer.rs        # Add photos to library
 │   ├── compare.rs           # Comparison logic
 │   └── report.rs            # Reporting functionality
@@ -76,11 +77,10 @@ iphoto-sifter/
 4. **anyhow** - Error handling
 5. **thiserror** - Custom error types
 
-### iPhoto Library Parsing
-6. **plist** - Parse XML-based AlbumData.xml files
-7. **rusqlite** - Parse SQLite databases (iPhoto 9.5+)
-8. **serde** - Serialization/deserialization
-9. **serde_json** - JSON handling for reports
+### Photos.app Library Parsing
+6. **rusqlite** - SQLite database access for Photos.sqlite
+7. **serde** - Serialization/deserialization
+8. **serde_json** - JSON handling for reports
 
 ### Additional Utilities
 10. **chrono** - Date/time handling
